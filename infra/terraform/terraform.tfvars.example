@@ -1,0 +1,6 @@
+owner       = "YOUR_GITHUB_USERNAME"
+expires_at  = "2026-07-13T18:00:00Z"
+budget_usd  = 5
+budget_email = "you@example.com"
+# public_key = "ssh-ed25519 AAAA..."
+# ssh_cidrs  = ["203.0.113.10/32"]

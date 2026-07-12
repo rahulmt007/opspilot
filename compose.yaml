@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    ports: ["8000:8000"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    ports: ["9090:9090"]
+    volumes: ["./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports: ["3000:3000"]
+    environment: ["GF_SECURITY_ADMIN_PASSWORD=admin"]
+    volumes: ["./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro"]
