@@ -22,6 +22,10 @@ variable "root_volume_gb" {
 variable "ssh_cidrs" {
   type    = list(string)
   default = []
+  validation {
+    condition     = alltrue([for cidr in var.ssh_cidrs : can(regex("/32$", cidr))])
+    error_message = "Every SSH CIDR must identify one IPv4 address with a /32 suffix."
+  }
 }
 variable "public_key" {
   type      = string

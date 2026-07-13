@@ -12,11 +12,16 @@ data "aws_ami" "al2023" {
 }
 
 resource "aws_vpc" "main" {
+  # checkov:skip=CKV2_AWS_11: Flow-log storage adds cost to this short-lived free-tier showcase.
   cidr_block           = "10.42.0.0/16"
   enable_dns_hostnames = true
 }
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.main.id
+}
 resource "aws_internet_gateway" "main" { vpc_id = aws_vpc.main.id }
 resource "aws_subnet" "public" {
+  # checkov:skip=CKV_AWS_130: Public addressing avoids a paid NAT Gateway for this ephemeral demo.
   vpc_id                  = aws_vpc.main.id
   cidr_block              = "10.42.1.0/24"
   map_public_ip_on_launch = true
@@ -33,7 +38,9 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 resource "aws_security_group" "app" {
+  # checkov:skip=CKV_AWS_24: Optional SSH ingress is disabled by default and restricted to validated /32 CIDRs.
   name_prefix = "opspilot-"
+  description = "OpsPilot ephemeral showcase access"
   vpc_id      = aws_vpc.main.id
   ingress {
     description = "demo HTTP"
@@ -53,9 +60,10 @@ resource "aws_security_group" "app" {
     }
   }
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "HTTPS package and container downloads"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -65,11 +73,14 @@ resource "aws_key_pair" "deployer" {
   public_key      = var.public_key
 }
 resource "aws_instance" "app" {
+  # checkov:skip=CKV_AWS_126: Detailed monitoring adds cost to this short-lived free-tier showcase.
+  # checkov:skip=CKV2_AWS_41: The instance needs no AWS API access, so attaching an IAM role adds needless privilege.
   ami                    = data.aws_ami.al2023.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.app.id]
   key_name               = var.public_key == "" ? null : aws_key_pair.deployer[0].key_name
+  ebs_optimized          = true
   metadata_options {
     http_tokens   = "required"
     http_endpoint = "enabled"
