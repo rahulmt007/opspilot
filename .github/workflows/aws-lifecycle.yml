@@ -1,28 +1,39 @@
-name: AWS lifecycle
+name: AWS plan
 on:
   workflow_dispatch:
     inputs:
-      action: {description: "plan, apply, or destroy", required: true, type: choice, options: [plan, apply, destroy]}
-      expires_at: {description: "UTC ISO-8601 deadline", required: true, type: string}
+      expires_at:
+        description: "UTC ISO-8601 cleanup deadline for the future showcase deployment"
+        required: true
+        type: string
+
+concurrency:
+  group: aws-showcase
+  cancel-in-progress: false
+
 permissions:
   contents: read
   id-token: write
+
 jobs:
-  terraform:
+  plan:
     runs-on: ubuntu-latest
     environment: aws-showcase
+    timeout-minutes: 20
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_IN_AUTOMATION: true
+      TF_VAR_owner: ${{ github.repository_owner }}
+      TF_VAR_expires_at: ${{ inputs.expires_at }}
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
+          role-session-name: opspilot-${{ github.run_id }}
       - uses: hashicorp/setup-terraform@v3
       - run: terraform -chdir=infra/terraform init
       - run: terraform -chdir=infra/terraform validate
-      - if: inputs.action == 'plan'
-        run: terraform -chdir=infra/terraform plan -var='owner=${{ github.repository_owner }}' -var='expires_at=${{ inputs.expires_at }}'
-      - if: inputs.action == 'apply'
-        run: terraform -chdir=infra/terraform apply -auto-approve -var='owner=${{ github.repository_owner }}' -var='expires_at=${{ inputs.expires_at }}'
-      - if: inputs.action == 'destroy'
-        run: terraform -chdir=infra/terraform destroy -auto-approve -var='owner=${{ github.repository_owner }}' -var='expires_at=${{ inputs.expires_at }}'
+      - run: terraform -chdir=infra/terraform plan -lock=false

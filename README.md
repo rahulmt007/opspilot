@@ -60,9 +60,10 @@ An optional natural-language interface uses the OpenAI Responses API and functio
 - `deploy/k8s/`: local `kind` manifests with probes, resources, and rolling updates
 - `deploy/docker/`: production-like Compose overlay
 - `monitoring/`: Prometheus and Grafana provisioning
-- `.github/workflows/`: CI, manual AWS deploy, rollback, and destroy workflows
+- `.github/workflows/`: CI and manual, OIDC-authenticated AWS planning
 - `docs/ARCHITECTURE.md`: decisions, threat model, and cost envelope
 - `docs/ROADMAP.md`: phased implementation and LinkedIn demo script
+- `docs/PHASE0_AWS_SAFETY.md`: AWS account safety and GitHub OIDC bootstrap
 
 ## Cost guardrails
 
@@ -71,7 +72,8 @@ An optional natural-language interface uses the OpenAI Responses API and functio
 - AWS resources are optional, tagged with `Project`, `Environment`, `Owner`, and `ExpiresAt`.
 - Terraform requires an explicit monthly budget amount and installs budget notifications when an email is supplied.
 - EC2 defaults to one small instance and one small encrypted root volume; SSH ingress defaults to no addresses.
-- Apply/deploy/destroy workflows use GitHub Environments for approval and OIDC rather than long-lived AWS keys.
+- AWS planning uses a protected GitHub Environment and OIDC rather than long-lived AWS keys.
+- Apply and destroy stay disabled until durable remote Terraform state is configured.
 - `scripts/find-expired-resources.sh` identifies expired project resources; `terraform destroy` remains the cleanup authority.
 
 Read [the architecture](docs/ARCHITECTURE.md) before creating AWS resources. AWS eligibility and pricing depend on account creation date, region, and current offers; treat credits as a cap, not a design target.
