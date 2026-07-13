@@ -1,0 +1,28 @@
+name: AWS lifecycle
+on:
+  workflow_dispatch:
+    inputs:
+      action: {description: "plan, apply, or destroy", required: true, type: choice, options: [plan, apply, destroy]}
+      expires_at: {description: "UTC ISO-8601 deadline", required: true, type: string}
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    environment: aws-showcase
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+      - uses: hashicorp/setup-terraform@v3
+      - run: terraform -chdir=infra/terraform init
+      - run: terraform -chdir=infra/terraform validate
+      - if: inputs.action == 'plan'
+        run: terraform -chdir=infra/terraform plan -var='owner=${{ github.repository_owner }}' -var='expires_at=${{ inputs.expires_at }}'
+      - if: inputs.action == 'apply'
+        run: terraform -chdir=infra/terraform apply -auto-approve -var='owner=${{ github.repository_owner }}' -var='expires_at=${{ inputs.expires_at }}'
+      - if: inputs.action == 'destroy'
+        run: terraform -chdir=infra/terraform destroy -auto-approve -var='owner=${{ github.repository_owner }}' -var='expires_at=${{ inputs.expires_at }}'
