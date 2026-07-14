@@ -36,7 +36,7 @@ pytest
 docker compose up --build
 ```
 
-Open `http://localhost:8000/health`, Prometheus at `http://localhost:9090`, and Grafana at `http://localhost:3000` (`admin` / `admin`, local demo only).
+Open `http://localhost:8000/health`, Prometheus at `http://localhost:9090`, and the provisioned OpsPilot Grafana dashboard at `http://localhost:3000/d/opspilot-overview/opspilot-overview` (`admin` / `admin`, local demo only).
 
 Use the agent:
 
@@ -58,8 +58,8 @@ An optional natural-language interface uses the OpenAI Responses API and functio
 - `src/devops_agent/`: FastAPI demo app, guarded command runner, CLI, optional LLM router
 - `infra/terraform/`: minimal AWS network, security group, EC2 host, budget, TTL tagging
 - `deploy/k8s/`: local `kind` manifests with probes, resources, and rolling updates
-- `deploy/docker/`: production-like Compose overlay
-- `monitoring/`: Prometheus and Grafana provisioning
+- `compose.yaml`: local application, Prometheus, and Grafana stack
+- `monitoring/`: Prometheus configuration and provisioned Grafana datasource/dashboard
 - `.github/workflows/`: CI and manual, OIDC-authenticated AWS planning
 - `docs/ARCHITECTURE.md`: decisions, threat model, and cost envelope
 - `docs/ROADMAP.md`: phased implementation and LinkedIn demo script
