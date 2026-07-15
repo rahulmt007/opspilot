@@ -1,0 +1,146 @@
+name: Publish image
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: publish-image-${{ github.event.workflow_run.head_sha }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+  IMAGE_TAG: ghcr.io/${{ github.repository }}:${{ github.event.workflow_run.head_sha }}
+  CERTIFICATE_IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/publish-image.yml@refs/heads/main
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Check out the tested commit
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build and push immutable image
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.IMAGE_TAG }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.event.workflow_run.head_sha }}
+
+      - name: Generate SPDX SBOM from the published digest
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload SBOM evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: opspilot-${{ github.event.workflow_run.head_sha }}-sbom
+          path: sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Keyless-sign image digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "$IMAGE@$DIGEST"
+
+      - name: Attach keyless-signed SBOM attestation
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$IMAGE@$DIGEST"
+
+  verify:
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Prove immutable tag resolves to the published digest
+        env:
+          EXPECTED_DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          resolved_digest="$(docker buildx imagetools inspect "$IMAGE_TAG" --format '{{.Manifest.Digest}}')"
+          test "$resolved_digest" = "$EXPECTED_DIGEST"
+          echo "Verified $IMAGE_TAG resolves to $EXPECTED_DIGEST"
+
+      - name: Verify keyless signature and SBOM attestation
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          cosign verify \
+            --certificate-identity "$CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$IMAGE@$DIGEST"
+          cosign verify-attestation \
+            --certificate-identity "$CERTIFICATE_IDENTITY" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            --type spdxjson \
+            "$IMAGE@$DIGEST"
+
+      - name: Record verified artifact
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
+          {
+            echo "### Verified published image"
+            echo "- Tag: \`$IMAGE_TAG\`"
+            echo "- Digest: \`$DIGEST\`"
+            echo "- Signature identity: \`$CERTIFICATE_IDENTITY\`"
+          } >> "$GITHUB_STEP_SUMMARY"
