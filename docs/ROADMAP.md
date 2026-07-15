@@ -19,12 +19,12 @@ Exit: CI can assume only the scoped role, and the operator understands that cred
 
 Exit: local Compose works and Kubernetes smoke tests pass.
 
-## Phase 2 — delivery and supply-chain security (scaffolded)
+## Phase 2 — delivery and supply-chain security (in progress)
 
 - GitHub Actions for lint, tests, image build, Trivy, Checkov, and kind smoke test.
 - Jenkinsfile retained as an interview artifact; GitHub Actions is the no-controller default.
-- Add image publishing with immutable SHA tags, SBOM generation, and keyless signing.
-- Pin third-party actions by commit SHA before production use.
+- Publish the image to GHCR with immutable SHA tags, an attached SPDX SBOM, and keyless signing. (Implemented)
+- Pin third-party actions by commit SHA before production use. (Implemented)
 
 Exit: a pull request produces repeatable test and scan evidence.
 

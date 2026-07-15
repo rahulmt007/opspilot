@@ -53,6 +53,17 @@ opspilot aws-destroy --execute
 
 An optional natural-language interface uses the OpenAI Responses API and function tools. Set `OPENAI_API_KEY`, install the `agent` extra, and run `opspilot ask "check the project status"`. The deterministic CLI remains fully usable without an API key.
 
+## Published image and supply-chain evidence
+
+After CI succeeds for a push to `main`, GitHub Actions publishes the application as
+`ghcr.io/rahulmt007/opspilot:<full-git-sha>`. The workflow records the registry digest,
+generates an SPDX JSON SBOM, attaches it as a keyless-signed Cosign attestation, and signs
+the image digest with GitHub OIDC. A separate job verifies that the immutable SHA tag
+resolves to the expected digest and validates both the signature and SBOM attestation.
+
+All third-party GitHub Actions are pinned to full commit SHAs. Human-readable version
+comments beside each pin make controlled upgrades reviewable.
+
 ## Repository map
 
 - `src/devops_agent/`: FastAPI demo app, guarded command runner, CLI, optional LLM router
