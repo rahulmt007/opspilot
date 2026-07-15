@@ -120,19 +120,26 @@ jobs:
           test "$resolved_digest" = "$EXPECTED_DIGEST"
           echo "Verified $IMAGE_TAG resolves to $EXPECTED_DIGEST"
 
-      - name: Verify keyless signature and SBOM attestation
+      - name: Verify keyless image signature
         env:
           DIGEST: ${{ needs.publish.outputs.digest }}
         run: |
           cosign verify \
             --certificate-identity "$CERTIFICATE_IDENTITY" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            "$IMAGE@$DIGEST"
+            "$IMAGE@$DIGEST" > /dev/null
+          echo "Verified keyless signature for $IMAGE@$DIGEST"
+
+      - name: Verify keyless SBOM attestation
+        env:
+          DIGEST: ${{ needs.publish.outputs.digest }}
+        run: |
           cosign verify-attestation \
             --certificate-identity "$CERTIFICATE_IDENTITY" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             --type spdxjson \
-            "$IMAGE@$DIGEST"
+            "$IMAGE@$DIGEST" > /dev/null
+          echo "Verified signed SPDX SBOM attestation for $IMAGE@$DIGEST"
 
       - name: Record verified artifact
         env:
