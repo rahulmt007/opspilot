@@ -32,9 +32,16 @@ variable "existing_oidc_provider_arn" {
   description = "Existing GitHub OIDC provider ARN when create_oidc_provider is false."
   type        = string
   default     = null
+}
 
-  validation {
-    condition     = var.create_oidc_provider || var.existing_oidc_provider_arn != null
-    error_message = "Set existing_oidc_provider_arn when create_oidc_provider is false."
-  }
+variable "terraform_state_bucket" {
+  description = "Pre-created S3 bucket used for the showcase Terraform state."
+  type        = string
+  default     = ""
+}
+
+variable "terraform_state_key" {
+  description = "State object key inside the pre-created Terraform state bucket."
+  type        = string
+  default     = "opspilot/showcase/terraform.tfstate"
 }

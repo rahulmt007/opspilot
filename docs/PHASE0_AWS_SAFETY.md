@@ -96,7 +96,7 @@ In **Settings -> Environments -> aws-showcase**:
 
 Run **AWS plan** manually in GitHub Actions with a near-term ISO-8601 `expires_at` value. A successful run proves OIDC role assumption and Terraform planning only.
 
-Apply and destroy remain intentionally disabled. They must not be enabled until Phase 3 adds durable remote Terraform state and a tested recovery procedure.
+Phase 3 enables guarded plan/apply/destroy only after a versioned, encrypted S3 state bucket is pre-created and the OIDC role is granted access to its state and lock objects. See [the Phase 3 runbook](PHASE3_AWS_SHOWCASE.md).
 
 ## Cleanup
 

@@ -1,9 +1,20 @@
-name: AWS plan
+name: AWS showcase
+
 on:
   workflow_dispatch:
     inputs:
+      action:
+        description: "Terraform operation to run"
+        required: true
+        type: choice
+        options: [plan, apply, destroy]
+        default: plan
       expires_at:
-        description: "UTC ISO-8601 cleanup deadline for the future showcase deployment"
+        description: "UTC ISO-8601 cleanup deadline for the showcase deployment"
+        required: true
+        type: string
+      image_digest:
+        description: "Full sha256 digest of the signed GHCR image"
         required: true
         type: string
 
@@ -16,24 +27,79 @@ permissions:
   id-token: write
 
 jobs:
-  plan:
+  terraform:
     runs-on: ubuntu-latest
     environment: aws-showcase
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_EC2_METADATA_DISABLED: true
       TF_IN_AUTOMATION: true
       TF_VAR_owner: ${{ github.repository_owner }}
       TF_VAR_expires_at: ${{ inputs.expires_at }}
+      TF_VAR_image_digest: ${{ inputs.image_digest }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-      - uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
+      - name: Check out the deployment code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Log in to AWS with GitHub OIDC
+        uses: aws-actions/configure-aws-credentials@d979d5b3a71173a29b74b5b88418bfda9437d885 # v6.1.1
         with:
           role-to-assume: ${{ vars.AWS_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
           allowed-account-ids: ${{ vars.AWS_ACCOUNT_ID }}
           role-session-name: opspilot-${{ github.run_id }}
-      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
-      - run: terraform -chdir=infra/terraform init
-      - run: terraform -chdir=infra/terraform validate
-      - run: terraform -chdir=infra/terraform plan -lock=false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+
+      - name: Require the pre-created remote state bucket
+        run: test -n "$TF_STATE_BUCKET"
+
+      - name: Initialize locked remote state
+        run: >-
+          terraform -chdir=infra/terraform init -input=false
+          -backend-config="bucket=$TF_STATE_BUCKET"
+          -backend-config="region=$AWS_REGION"
+
+      - name: Validate Terraform
+        run: terraform -chdir=infra/terraform validate
+
+      - name: Plan showcase infrastructure
+        if: inputs.action == 'plan' || inputs.action == 'apply'
+        run: terraform -chdir=infra/terraform plan -input=false -lock-timeout=5m -out=tfplan
+
+      - name: Apply approved showcase infrastructure
+        if: inputs.action == 'apply'
+        run: terraform -chdir=infra/terraform apply -input=false -auto-approve tfplan
+
+      - name: Verify deployed application health
+        if: inputs.action == 'apply'
+        run: |
+          public_url="$(terraform -chdir=infra/terraform output -raw public_url)"
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 5 "$public_url/health"; then
+              echo "Healthy: $public_url"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Application did not become healthy: $public_url" >&2
+          exit 1
+
+      - name: Destroy showcase infrastructure
+        if: inputs.action == 'destroy'
+        run: terraform -chdir=infra/terraform destroy -input=false -auto-approve -lock-timeout=5m
+
+      - name: Record deployment evidence
+        if: inputs.action == 'apply'
+        run: |
+          public_url="$(terraform -chdir=infra/terraform output -raw public_url)"
+          image_ref="$(terraform -chdir=infra/terraform output -raw image_ref)"
+          {
+            echo "### OpsPilot AWS showcase"
+            echo "- URL: $public_url"
+            echo "- Image: $image_ref"
+            echo "- Expires at: ${{ inputs.expires_at }}"
+          } >> "$GITHUB_STEP_SUMMARY"
