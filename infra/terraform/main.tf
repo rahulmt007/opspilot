@@ -90,11 +90,12 @@ resource "aws_instance" "app" {
     volume_size = var.root_volume_gb
     volume_type = "gp3"
   }
-  user_data = <<-EOF
+  user_data_replace_on_change = true
+  user_data                   = <<-EOF
     #!/bin/bash
     dnf install -y docker
     systemctl enable --now docker
-    docker run -d --restart unless-stopped --name opspilot -p 8000:8000 ghcr.io/${var.owner}/opspilot:latest
+    docker run --pull always -d --restart unless-stopped --name opspilot -p 8000:8000 ${var.image_repository}@${var.image_digest}
   EOF
 }
 resource "aws_budgets_budget" "monthly" {

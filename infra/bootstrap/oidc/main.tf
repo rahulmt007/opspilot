@@ -1,11 +1,19 @@
 data "aws_caller_identity" "current" {}
 
+check "oidc_provider_configuration" {
+  assert {
+    condition     = var.create_oidc_provider || var.existing_oidc_provider_arn != null
+    error_message = "Set existing_oidc_provider_arn when create_oidc_provider is false."
+  }
+}
+
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.create_oidc_provider ? 1 : 0
 
   url             = "https://token.actions.githubusercontent.com"
   client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = []
+  # Preserve the existing GitHub OIDC provider thumbprint during showcase updates.
+  thumbprint_list = ["ab9d0263244dd0326eb67015705a667e79cfe998"]
 
   tags = {
     Project   = "opspilot"
@@ -161,6 +169,39 @@ data "aws_iam_policy_document" "showcase" {
     effect    = "Allow"
     actions   = ["billing:GetBillingViewData"]
     resources = ["*"]
+  }
+
+  dynamic "statement" {
+    for_each = var.terraform_state_bucket == "" ? [] : [var.terraform_state_bucket]
+    content {
+      sid       = "ManageTerraformState"
+      effect    = "Allow"
+      actions   = ["s3:ListBucket"]
+      resources = ["arn:aws:s3:::${statement.value}"]
+
+      condition {
+        test     = "StringLike"
+        variable = "s3:prefix"
+        values   = [var.terraform_state_key, "${var.terraform_state_key}.tflock"]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = var.terraform_state_bucket == "" ? [] : [var.terraform_state_bucket]
+    content {
+      sid    = "ReadWriteTerraformState"
+      effect = "Allow"
+      actions = [
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:PutObject"
+      ]
+      resources = [
+        "arn:aws:s3:::${statement.value}/${var.terraform_state_key}",
+        "arn:aws:s3:::${statement.value}/${var.terraform_state_key}.tflock"
+      ]
+    }
   }
 }
 

@@ -71,7 +71,7 @@ comments beside each pin make controlled upgrades reviewable.
 - `deploy/k8s/`: local `kind` manifests with probes, resources, and rolling updates
 - `compose.yaml`: local application, Prometheus, and Grafana stack
 - `monitoring/`: Prometheus configuration and provisioned Grafana datasource/dashboard
-- `.github/workflows/`: CI and manual, OIDC-authenticated AWS planning
+- `.github/workflows/`: CI, image publishing, and guarded OIDC-authenticated AWS showcase
 - `docs/ARCHITECTURE.md`: decisions, threat model, and cost envelope
 - `docs/ROADMAP.md`: phased implementation and LinkedIn demo script
 - `docs/PHASE0_AWS_SAFETY.md`: AWS account safety and GitHub OIDC bootstrap
@@ -84,7 +84,7 @@ comments beside each pin make controlled upgrades reviewable.
 - Terraform requires an explicit monthly budget amount and installs budget notifications when an email is supplied.
 - EC2 defaults to one small instance and one small encrypted root volume; SSH ingress defaults to no addresses.
 - AWS planning uses a protected GitHub Environment and OIDC rather than long-lived AWS keys.
-- Apply and destroy stay disabled until durable remote Terraform state is configured.
+- AWS apply and destroy require the protected `aws-showcase` environment and durable remote Terraform state.
 - `scripts/find-expired-resources.sh` identifies expired project resources; `terraform destroy` remains the cleanup authority.
 
 Read [the architecture](docs/ARCHITECTURE.md) before creating AWS resources. AWS eligibility and pricing depend on account creation date, region, and current offers; treat credits as a cap, not a design target.

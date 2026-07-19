@@ -4,3 +4,6 @@ output "public_url" {
 output "expires_at" {
   value = var.expires_at
 }
+output "image_ref" {
+  value = "${var.image_repository}@${var.image_digest}"
+}

@@ -28,12 +28,13 @@ Exit: local Compose works and Kubernetes smoke tests pass.
 
 Exit: a pull request produces repeatable test and scan evidence.
 
-## Phase 3 — guarded AWS showcase (foundation scaffolded)
+## Phase 3 — guarded AWS showcase (in progress)
 
 - Review Terraform, current prices, AMI architecture, and instance eligibility.
-- Add remote state only if needed, using a pre-created low-cost backend.
-- Publish image to GHCR and deploy a SHA/digest rather than `latest`.
-- Verify health, save evidence, then destroy within the TTL window.
+- Add remote state using a pre-created, versioned S3 bucket with native lock files. (Implemented)
+- Publish image to GHCR and deploy a SHA/digest rather than `latest`. (Implemented)
+- Add guarded plan/apply/destroy workflow with health verification and evidence. (Implemented)
+- Execute the first approved AWS showcase and destroy it within the TTL window. (Next)
 
 Exit: manual plan/apply/destroy workflow succeeds with no long-lived credentials.
 
