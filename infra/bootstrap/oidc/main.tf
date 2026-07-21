@@ -10,8 +10,8 @@ check "oidc_provider_configuration" {
 resource "aws_iam_openid_connect_provider" "github" {
   count = var.create_oidc_provider ? 1 : 0
 
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
   # Preserve the existing GitHub OIDC provider thumbprint during showcase updates.
   thumbprint_list = ["ab9d0263244dd0326eb67015705a667e79cfe998"]
 
@@ -146,9 +146,16 @@ data "aws_iam_policy_document" "showcase" {
       variable = "aws:RequestedRegion"
       values   = [var.aws_region]
     }
+  }
+
+  statement {
+    sid       = "DenyNonMicroInstances"
+    effect    = "Deny"
+    actions   = ["ec2:RunInstances"]
+    resources = ["*"]
 
     condition {
-      test     = "StringEquals"
+      test     = "StringNotEquals"
       variable = "ec2:InstanceType"
       values   = ["t3.micro"]
     }
@@ -159,6 +166,7 @@ data "aws_iam_policy_document" "showcase" {
     effect = "Allow"
     actions = [
       "budgets:ModifyBudget",
+      "budgets:TagResource",
       "budgets:ViewBudget"
     ]
     resources = ["arn:aws:budgets::${data.aws_caller_identity.current.account_id}:budget/opspilot-*"]
